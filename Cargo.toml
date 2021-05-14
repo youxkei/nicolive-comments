@@ -3,9 +3,14 @@ name = "nicolive-comments"
 version = "0.1.0"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+futures-util = "0.3.15"
 paw = "1.0.0"
-structopt = { version = "0.3.21", features = [ "paw" ] }
-url = "2.2.2"
+reqwest = "0.11.3"
+scraper = "0.12.0"
+serde = "1.0.126"
+serde_json = "1.0.64"
+structopt = { version = "0.3.21", features = ["paw"] }
+tokio = { versioin = "1.5.0", features = ["full"] }
+tokio-tungstenite = { version = "0.14.0", features = ["rustls-tls"] }
+url = { version = "2.2.2", features = ["serde"] }
