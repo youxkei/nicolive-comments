@@ -1,13 +1,14 @@
+mod embedded_data;
+mod relive;
+
 use embedded_data::EmbeddedData;
 use futures_util::{SinkExt, StreamExt};
+use relive::Message;
 use scraper::{Html, Selector};
 use std::cell::RefCell;
 use std::rc::Rc;
-use tokio::io::AsyncWriteExt;
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message::Text};
 use url::Url;
-
-mod embedded_data;
 
 /// A command-line tool for fetching comments from nicolive.
 #[derive(structopt::StructOpt, Debug)]
@@ -48,28 +49,30 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut relive_writer, relive_reader) = relive_stream.split();
 
-    relive_writer.send(Message::Text("{\"type\":\"startWatching\",\"data\":{\"stream\":{\"quality\":\"abr\",\"protocol\":\"hls\",\"latency\":\"low\",\"chasePlay\":false},\"room\":{\"protocol\":\"webSocket\",\"commentable\":true},\"reconnect\":false}}".to_string())).await?;
+    let pong = serde_json::to_string(&Message::Pong)?;
+    let keep_seat = serde_json::to_string(&Message::KeepSeat)?;
+
+    relive_writer.send(Text("{\"type\":\"startWatching\",\"data\":{\"stream\":{\"quality\":\"abr\",\"protocol\":\"hls\",\"latency\":\"low\",\"chasePlay\":false},\"room\":{\"protocol\":\"webSocket\",\"commentable\":true},\"reconnect\":false}}".to_string())).await?;
 
     let relive_writer = Rc::new(RefCell::new(relive_writer));
 
     relive_reader
         .for_each(|message| async {
-            let message_data = message.unwrap().into_data();
-            let message = std::str::from_utf8(&message_data).unwrap();
-            println!("{}", message);
+            let message: Message = serde_json::from_slice(&message.unwrap().into_data()).unwrap();
+            println!("↓ {:?}", message);
 
-            if message == r#"{"type":"ping"}"# {
-                relive_writer
-                    .borrow_mut()
-                    .send(Message::Text(r#"{"type":"pong"}"#.to_string()))
-                    .await
-                    .unwrap();
+            match message {
+                Message::Ping => {
+                    let mut relive_writer = relive_writer.borrow_mut();
 
-                relive_writer
-                    .borrow_mut()
-                    .send(Message::Text(r#"{"type":"keepSeat"}"#.to_string()))
-                    .await
-                    .unwrap();
+                    println!("↑ {:?}", Message::Pong);
+                    relive_writer.send(Text(pong.clone())).await.unwrap();
+
+                    println!("↑ {:?}", Message::KeepSeat);
+                    relive_writer.send(Text(keep_seat.clone())).await.unwrap();
+                }
+
+                _ => {}
             }
         })
         .await;
