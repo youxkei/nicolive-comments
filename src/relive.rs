@@ -1,17 +1,36 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Debug)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum Message {
+pub enum TxMessage {
+    StartWatching { data: StartWatchingData },
+    Pong,
+    KeepSeat,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum RxMessage {
     ServerTime { data: ServerTimeData },
     Seat,
-    Stream,
     Room { data: RoomData },
     Statistics { data: StatisticsData },
     Ping,
-    Pong,
-    KeepSeat,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StartWatchingData {
+    pub room: StartWatchingDataRoom,
+    pub recconect: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StartWatchingDataRoom {
+    pub protocol: String,
+    pub commentable: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -24,6 +43,7 @@ pub struct ServerTimeData {
 #[serde(rename_all = "camelCase")]
 pub struct RoomData {
     pub message_server: MessageServer,
+    pub thread_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
