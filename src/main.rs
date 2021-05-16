@@ -21,6 +21,10 @@ struct Args {
     /// Outputs comments with JSON format.
     #[structopt(short, long)]
     json: bool,
+
+    /// Outputs appended comments
+    #[structopt(short, long)]
+    follow: bool,
 }
 
 #[paw::main]
@@ -109,18 +113,21 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
         let (mut message_writer, message_reader) = message_stream.split();
 
-        let thread_message = message_server::TxMessage::Thread {
-            thread: thread.to_string(),
-            version: "20061206".to_string(),
-            user_id: "guest".to_string(),
-            res_from: -150,
-            with_global: 1,
-            scores: 1,
-            nicoru: 0,
-        };
+        let thread_messages = vec![
+            message_server::TxMessage::Thread {
+                thread: thread.to_string(),
+                version: "20061206".to_string(),
+                user_id: "guest".to_string(),
+                res_from: -150,
+                with_global: 1,
+                scores: 1,
+                nicoru: 0,
+            },
+            message_server::TxMessage::Ping(message_server::PingData::Rf0),
+        ];
 
         message_writer
-            .send(Text(serde_json::to_string(&thread_message).unwrap()))
+            .send(Text(serde_json::to_string(&thread_messages).unwrap()))
             .await
             .unwrap();
 
@@ -135,6 +142,12 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                             println!("{}", serde_json::to_string(&message).unwrap());
                         } else {
                             println!("{}", content)
+                        }
+                    }
+
+                    message_server::RxMessage::Ping(message_server::PingData::Rf0) => {
+                        if !args.follow {
+                            std::process::exit(0);
                         }
                     }
 

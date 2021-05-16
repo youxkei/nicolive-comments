@@ -4,6 +4,8 @@ use serde::{de::Deserializer, Deserialize, Serialize};
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum TxMessage {
+    Ping(PingData),
+
     Thread {
         thread: String,
         version: String,
@@ -25,6 +27,8 @@ where
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum RxMessage {
+    Ping(PingData),
+
     Thread {
         #[serde(alias = "resultcode")]
         result_code: i32,
@@ -36,4 +40,11 @@ pub enum RxMessage {
         user_id: String,
         content: String,
     },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "content", rename_all = "camelCase")]
+pub enum PingData {
+    #[serde(rename = "rf:0")]
+    Rf0,
 }
