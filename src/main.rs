@@ -54,7 +54,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut relive_writer, relive_reader) = relive_stream.split();
 
-    let (message_server_url_tx, mut message_server_url_rx) = channel(1);
+    let (message_server_tx, mut message_server_rx) = channel(1);
 
     let pong_message_serialized = serde_json::to_string(&relive::TxMessage::Pong)?;
     let keep_seat_message_serialized = serde_json::to_string(&relive::TxMessage::KeepSeat)?;
@@ -94,7 +94,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                     .unwrap();
             }
 
-            relive::RxMessage::Room { data } => message_server_url_tx
+            relive::RxMessage::Room { data } => message_server_tx
                 .send((data.message_server.uri, data.thread_id))
                 .await
                 .unwrap(),
@@ -104,7 +104,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let receive_message = async move {
-        let (message_server_url, thread) = message_server_url_rx.recv().await.unwrap();
+        let (message_server_url, thread) = message_server_rx.recv().await.unwrap();
         let (message_stream, _response) = connect_async(message_server_url).await.unwrap();
 
         let (mut message_writer, message_reader) = message_stream.split();
