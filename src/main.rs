@@ -18,6 +18,11 @@ struct Args {
     #[structopt(name = "URL", parse(try_from_str))]
     url: Url,
 
+    /// Fetches about <num-comments> comments.
+    /// Must be in the range 0-200
+    #[structopt(short, long, default_value = "150")]
+    num_comments: i32,
+
     /// Outputs comments with JSON format.
     #[structopt(short, long)]
     json: bool,
@@ -30,6 +35,20 @@ struct Args {
 #[paw::main]
 #[tokio::main]
 pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
+    if args.num_comments < 0 || 200 < args.num_comments {
+        eprintln!(concat!(
+            "\x1B[31m",
+            "error:",
+            "\x1B[0m",
+            "Invalid value for '",
+            "\x1B[33m",
+            "--num-comments <num-comments>",
+            "\x1B[0m",
+            "': must be in the range 0-200"
+        ));
+        std::process::exit(1);
+    }
+
     let embedded_data_selector = Selector::parse("#embedded-data").unwrap();
 
     let live_page_html = Html::parse_document(
@@ -118,7 +137,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 thread: thread.to_string(),
                 version: "20061206".to_string(),
                 user_id: "guest".to_string(),
-                res_from: -150,
+                res_from: -args.num_comments,
                 with_global: 1,
                 scores: 1,
                 nicoru: 0,
