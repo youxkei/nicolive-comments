@@ -1,4 +1,3 @@
-use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Debug)]
@@ -12,31 +11,27 @@ pub enum TxMessage {
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum RxMessage {
-    ServerTime { data: ServerTimeData },
-    Seat,
     Room { data: RoomData },
-    Statistics { data: StatisticsData },
     Ping,
+    Disconnect { data: DisconnectData },
+    Reconnect,
+
+    Seat,
+    Akashic,
+    Stream,
+    ServerTime,
+    Statistics,
+    Schedule,
+    PostCommentResult,
+    TagUpdated,
+    Taxonomy,
+    StreamQualities,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StartWatchingData {
-    pub room: StartWatchingDataRoom,
     pub recconect: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct StartWatchingDataRoom {
-    pub protocol: String,
-    pub commentable: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ServerTimeData {
-    pub current_ms: DateTime<Local>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -52,10 +47,20 @@ pub struct MessageServer {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct StatisticsData {
-    pub viewers: i32,
-    pub comments: i32,
-    pub ad_points: i32,
-    pub gift_points: i32,
+pub struct DisconnectData {
+    pub reason: DisconnectReason,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum DisconnectReason {
+    Takeover,
+    NoPermission,
+    EndProgram,
+    PingTimemout,
+    TooManyConnections,
+    TooManyWatchings,
+    Crowded,
+    MaintenanceIn,
+    ServiceTemporarilyUnavailable,
 }

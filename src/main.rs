@@ -4,6 +4,7 @@ mod relive;
 
 use embedded_data::EmbeddedData;
 use futures_util::{SinkExt, StreamExt};
+use http::Request;
 use scraper::{Html, Selector};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -72,8 +73,13 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             ))?,
     )?;
 
-    let (relive_stream, _response) =
-        connect_async(embedded_data.site.relive.web_socket_url).await?;
+    let web_socket_request = Request::builder()
+        .uri(embedded_data.site.relive.web_socket_url.to_string())
+        .header("User-Agent", "https://github.com/youxkei/nicolive-comments")
+        .body(())
+        .unwrap();
+
+    let (relive_stream, _response) = connect_async(web_socket_request).await?;
 
     let (mut relive_writer, relive_reader) = relive_stream.split();
 
@@ -83,13 +89,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let keep_seat_message_serialized = serde_json::to_string(&relive::TxMessage::KeepSeat)?;
 
     let start_watching_message = relive::TxMessage::StartWatching {
-        data: relive::StartWatchingData {
-            room: relive::StartWatchingDataRoom {
-                protocol: "webSocket".to_string(),
-                commentable: false,
-            },
-            recconect: false,
-        },
+        data: relive::StartWatchingData { recconect: false },
     };
 
     relive_writer
@@ -111,6 +111,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .unwrap();
 
+                // TODO: use keep_interval_sec of seat message
                 relive_writer
                     .send(Text(keep_seat_message_serialized.clone()))
                     .await
@@ -121,6 +122,11 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 .send((data.message_server.uri, data.thread_id))
                 .await
                 .unwrap(),
+
+            relive::RxMessage::Disconnect { data } => {
+                eprintln!("Disconnected from server. reason: {:?}", data.reason);
+                std::process::exit(0);
+            }
 
             _ => {}
         }
