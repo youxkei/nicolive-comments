@@ -35,9 +35,13 @@ pub enum RxMessage {
     },
 
     Chat {
+        no: Option<i32>,
         #[serde(deserialize_with = "datetime_deserializer_to_local")]
         date: DateTime<Local>,
+        mail: Option<String>,
         user_id: String,
+        premium: Option<i32>,
+        anonymity: Option<i32>,
         content: String,
     },
 }
