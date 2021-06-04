@@ -8,7 +8,11 @@ use http::Request;
 use scraper::{Html, Selector};
 use std::cell::RefCell;
 use std::rc::Rc;
-use tokio::{join, sync::mpsc::channel};
+use tokio::{
+    join,
+    sync::mpsc::channel,
+    time::{interval, Duration},
+};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message::Text};
 use url::Url;
 
@@ -98,7 +102,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     let relive_writer = Rc::new(RefCell::new(relive_writer));
 
-    let receive_relive_message = relive_reader.for_each(|message| async {
+    let handle_relive_message = relive_reader.for_each(|message| async {
         let message: relive::RxMessage =
             serde_json::from_slice(&message.unwrap().into_data()).unwrap();
 
@@ -132,7 +136,7 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let receive_message = async move {
+    let handle_message = async move {
         let (message_server_url, thread) = message_server_rx.recv().await.unwrap();
         let (message_stream, _response) = connect_async(message_server_url).await.unwrap();
 
@@ -156,33 +160,43 @@ pub async fn main(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             .await
             .unwrap();
 
-        message_reader
-            .for_each(|message| async {
-                let message: message_server::RxMessage =
-                    serde_json::from_slice(&message.unwrap().into_data()).unwrap();
+        let receive_message = message_reader.for_each(|message| async {
+            let message: message_server::RxMessage =
+                serde_json::from_slice(&message.unwrap().into_data()).unwrap();
 
-                match message {
-                    message_server::RxMessage::Chat { ref content, .. } => {
-                        if args.json {
-                            println!("{}", serde_json::to_string(&message).unwrap());
-                        } else {
-                            println!("{}", content)
-                        }
+            match message {
+                message_server::RxMessage::Chat { ref content, .. } => {
+                    if args.json {
+                        println!("{}", serde_json::to_string(&message).unwrap());
+                    } else {
+                        println!("{}", content)
                     }
-
-                    message_server::RxMessage::Ping(message_server::PingData::Rf0) => {
-                        if !args.follow {
-                            std::process::exit(0);
-                        }
-                    }
-
-                    _ => {}
                 }
-            })
-            .await;
+
+                message_server::RxMessage::Ping(message_server::PingData::Rf0) => {
+                    if !args.follow {
+                        std::process::exit(0);
+                    }
+                }
+
+                _ => {}
+            }
+        });
+
+        let send_ping = async move {
+            let mut ping_interval = interval(Duration::from_secs(60));
+            ping_interval.tick().await;
+
+            loop {
+                ping_interval.tick().await;
+                message_writer.send(Text("".to_string())).await.unwrap();
+            }
+        };
+
+        join!(receive_message, send_ping);
     };
 
-    join!(receive_relive_message, receive_message);
+    join!(handle_relive_message, handle_message);
 
     Ok(())
 }
